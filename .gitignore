@@ -1,0 +1,40 @@
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Publish output
+publish/
+dist/
+
+# Runtime logs
+logs/
+*.log
+
+# Visual Studio / Rider / VS Code user files
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet
+packages/
+*.nupkg
+*.nuget.props
+*.nuget.targets
+
+# Temporary files
+*.tmp
+*.cache
+*.pdb
+*.ilk
+*.obj
+*.userprefs
+
+# Local secrets / certificates
+*.pfx
+*.publishsettings
