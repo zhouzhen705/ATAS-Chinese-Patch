@@ -29,14 +29,17 @@ ATAS Chinese Patch 是一个外部 Windows 桌面 EXE 工具，用于修复 ATAS
 
 1. 补丁前关闭 ATAS。
 2. 启动 ATAS Chinese Patch。
-3. 点击“选择 DLL”，选择 ATAS 自定义指标 DLL。
-4. 点击“扫描”，查看日志中发现的可替换字体和疑似字体相关字符串。
-5. 选择替换字体，默认是 SimSun。
-6. 点击“生成补丁 DLL”。
-7. 确认替换列表，例如 `Roboto -> SimSun`。
-8. 再次确认 ATAS 已关闭。
-9. 默认会在原 DLL 同级目录生成 `原文件名.CJKPatched.dll`，并自动备份原始 DLL。
-10. 如需覆盖原 DLL，可勾选“备份后覆盖原 DLL”，工具仍会先备份再写回。
+3. 确认 ATAS 安装目录和 ATAS 数据目录。默认会填入：
+   - `C:\Program Files (x86)\ATAS Platform`
+   - `%APPDATA%\ATAS`
+4. 点击“扫描目录”，工具会递归扫描这两个目录下的 `.dll` 文件。
+5. 扫描结果中只会列出发现硬编码可替换字体的 DLL。
+6. 检查候选 DLL 列表，取消勾选不想修改的 DLL。
+7. 选择替换字体，默认是 SimSun。
+8. 点击“修改已勾选”。
+9. 再次确认 ATAS 已关闭。
+10. 默认会在原 DLL 同级目录生成 `原文件名.CJKPatched.dll`，并自动备份原始 DLL。
+11. 如需覆盖原 DLL，可勾选“备份后覆盖原 DLL”，工具仍会先备份再写回。修改 `Program Files` 下的 DLL 可能需要以管理员身份运行。
 
 ATAS 指标 DLL 常见位置：
 
@@ -60,14 +63,14 @@ dotnet build .\TestIndicatorFontSamples\TestIndicatorFontSamples.csproj -c Relea
 TestIndicatorFontSamples\bin\Release\net10.0\TestIndicatorFontSamples.dll
 ```
 
-打开 ATAS Chinese Patch 后选择这个测试 DLL。扫描日志应能看到：
+打开 ATAS Chinese Patch 后，可以把其中一个扫描目录临时改为这个测试 DLL 所在文件夹。扫描日志应能看到：
 
 - `Roboto`
 - `Arial`
 - `Segoe UI`
 - 疑似字体相关字符串 `RenderFont`
 
-点击“生成补丁 DLL”后，默认会生成：
+点击“修改已勾选”后，默认会生成：
 
 ```text
 TestIndicatorFontSamples.CJKPatched.dll

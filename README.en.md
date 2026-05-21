@@ -29,14 +29,17 @@ Some ATAS custom indicator DLLs hard-code fonts such as Roboto, Arial, Tahoma, S
 
 1. Close ATAS before patching.
 2. Start ATAS Chinese Patch.
-3. Click "Select DLL" and choose an ATAS custom indicator DLL.
-4. Click "Scan" to review replaceable fonts and suspicious font-related strings in the log.
-5. Choose the replacement font. The default is SimSun.
-6. Click "Generate Patched DLL".
-7. Confirm the replacement list, for example `Roboto -> SimSun`.
-8. Confirm that ATAS is closed.
-9. By default, the tool creates `OriginalFileName.CJKPatched.dll` in the same folder and backs up the original DLL.
-10. To overwrite the original DLL, enable "Backup then overwrite original DLL". The tool still backs up the original file first.
+3. Confirm the ATAS installation folder and ATAS data folder. The defaults are:
+   - `C:\Program Files (x86)\ATAS Platform`
+   - `%APPDATA%\ATAS`
+4. Click "Scan Folders". The tool recursively scans `.dll` files in both folders.
+5. The result table only lists DLLs that contain replaceable hard-coded font names.
+6. Review the candidate DLL list and uncheck any DLL you do not want to modify.
+7. Choose the replacement font. The default is SimSun.
+8. Click "Patch Selected".
+9. Confirm that ATAS is closed.
+10. By default, the tool creates `OriginalFileName.CJKPatched.dll` in the same folder and backs up the original DLL.
+11. To overwrite the original DLL, enable "Backup then overwrite original DLL". The tool still backs up the original file first. Patching DLLs under `Program Files` may require running as administrator.
 
 Common ATAS indicator DLL location:
 
@@ -60,14 +63,14 @@ Sample DLL path:
 TestIndicatorFontSamples\bin\Release\net10.0\TestIndicatorFontSamples.dll
 ```
 
-Open ATAS Chinese Patch and select this DLL. The scan log should show:
+Open ATAS Chinese Patch and temporarily set one scan folder to the folder containing this test DLL. The scan log should show:
 
 - `Roboto`
 - `Arial`
 - `Segoe UI`
 - Suspicious font-related string `RenderFont`
 
-After clicking "Generate Patched DLL", the default output is:
+After clicking "Patch Selected", the default output is:
 
 ```text
 TestIndicatorFontSamples.CJKPatched.dll
