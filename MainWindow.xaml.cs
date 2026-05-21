@@ -39,27 +39,37 @@ public partial class MainWindow : Window
         BrowseFolderInto(DataPathTextBox, "选择 ATAS 数据目录");
     }
 
-    private void ScanFoldersButton_Click(object sender, RoutedEventArgs e)
+    private async void ScanFoldersButton_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            ScanFolders();
+            SetBusy(isBusy: true, activeOperation: "scan");
+            await ScanFoldersAsync();
         }
         catch (Exception ex)
         {
             ShowError(ex);
+        }
+        finally
+        {
+            SetBusy(isBusy: false);
         }
     }
 
-    private void PatchSelectedButton_Click(object sender, RoutedEventArgs e)
+    private async void PatchSelectedButton_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            PatchSelectedCandidates();
+            SetBusy(isBusy: true, activeOperation: "patch");
+            await PatchSelectedCandidatesAsync();
         }
         catch (Exception ex)
         {
             ShowError(ex);
+        }
+        finally
+        {
+            SetBusy(isBusy: false);
         }
     }
 
@@ -110,29 +120,60 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ScanFolders()
+    private async Task ScanFoldersAsync()
     {
         var roots = GetExistingScanRoots();
         if (roots.Count == 0)
             throw new InvalidOperationException("请至少填写一个存在的 ATAS 目录。");
 
         _candidateRows.Clear();
+        var replacementFont = GetSelectedReplacementFont();
 
+        var progress = new Progress<ScanProgress>(update =>
+        {
+            if (!string.IsNullOrWhiteSpace(update.Message))
+                AppendLog(update.Message);
+
+            if (update.Row is not null)
+                _candidateRows.Add(update.Row);
+        });
+
+        var summary = await Task.Run(() => ScanFoldersCore(roots, replacementFont, progress));
+        AppendLog(summary.Message);
+        SaveOperationLog(summary.OperationLogs);
+
+        if (summary.Candidates == 0)
+        {
+            System.Windows.MessageBox.Show(
+                this,
+                "没有发现包含可替换硬编码字体的 DLL。",
+                "ATAS Chinese Patch",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+    }
+
+    private ScanSummary ScanFoldersCore(
+        IReadOnlyCollection<string> roots,
+        string replacementFont,
+        IProgress<ScanProgress> progress)
+    {
         var scanned = 0;
         var skipped = 0;
         var candidates = 0;
         var operationLogs = new List<string>
         {
             "开始扫描 ATAS 目录。",
-            $"替换字体：{GetSelectedReplacementFont()}"
+            $"替换字体：{replacementFont}"
         };
 
         foreach (var root in roots)
         {
-            AppendLog($"开始扫描目录：{root}");
-            operationLogs.Add($"扫描目录：{root}");
+            var rootMessage = $"开始扫描目录：{root}";
+            progress.Report(new ScanProgress(Message: rootMessage));
+            operationLogs.Add(rootMessage);
 
-            foreach (var dllPath in EnumerateDllFilesSafe(root, operationLogs))
+            foreach (var dllPath in EnumerateDllFilesSafe(root, operationLogs, message => progress.Report(new ScanProgress(Message: message))))
             {
                 scanned++;
 
@@ -150,9 +191,9 @@ public partial class MainWindow : Window
 
                     candidates++;
                     var row = DllCandidateRow.FromResult(result);
-                    _candidateRows.Add(row);
-                    AppendLog($"发现可修改 DLL：{dllPath} | 字体：{row.DetectedFontsText}");
-                    operationLogs.Add($"发现可修改 DLL：{dllPath} | 字体：{row.DetectedFontsText}");
+                    var message = $"发现可修改 DLL：{dllPath} | 字体：{row.DetectedFontsText}";
+                    progress.Report(new ScanProgress(message, row));
+                    operationLogs.Add(message);
                 }
                 catch (InvalidOperationException)
                 {
@@ -161,29 +202,19 @@ public partial class MainWindow : Window
                 catch (Exception ex)
                 {
                     skipped++;
-                    AppendLog($"跳过 DLL：{dllPath} | {ex.Message}");
-                    operationLogs.Add($"跳过 DLL：{dllPath} | {ex.Message}");
+                    var message = $"跳过 DLL：{dllPath} | {ex.Message}";
+                    progress.Report(new ScanProgress(Message: message));
+                    operationLogs.Add(message);
                 }
             }
         }
 
         var summary = $"扫描完成：扫描 DLL {scanned} 个，发现可修改 {candidates} 个，跳过 {skipped} 个。";
-        AppendLog(summary);
         operationLogs.Add(summary);
-        SaveOperationLog(operationLogs);
-
-        if (candidates == 0)
-        {
-            System.Windows.MessageBox.Show(
-                this,
-                "没有发现包含可替换硬编码字体的 DLL。",
-                "ATAS Chinese Patch",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-        }
+        return new ScanSummary(summary, candidates, operationLogs);
     }
 
-    private void PatchSelectedCandidates()
+    private async Task PatchSelectedCandidatesAsync()
     {
         var selectedRows = _candidateRows.Where(row => row.IsSelected).ToList();
         if (selectedRows.Count == 0)
@@ -211,6 +242,35 @@ public partial class MainWindow : Window
             return;
         }
 
+        var progress = new Progress<PatchProgress>(update =>
+        {
+            if (!string.IsNullOrWhiteSpace(update.Status))
+                update.Row.Status = update.Status;
+
+            if (!string.IsNullOrWhiteSpace(update.OutputPath))
+            {
+                update.Row.OutputPath = update.OutputPath;
+                _lastOutputDirectory = update.Row.OutputDirectory;
+            }
+
+            if (update.ReplacedCount.HasValue)
+                update.Row.ReplacedCount = update.ReplacedCount.Value;
+
+            if (!string.IsNullOrWhiteSpace(update.Message))
+                AppendLog(update.Message);
+        });
+
+        var summary = await Task.Run(() => PatchSelectedCandidatesCore(selectedRows, replacementFont, overwriteOriginal, progress));
+        AppendLog(summary.Message);
+        SaveOperationLog(summary.OperationLogs);
+    }
+
+    private PatchSummary PatchSelectedCandidatesCore(
+        IReadOnlyCollection<DllCandidateRow> selectedRows,
+        string replacementFont,
+        bool overwriteOriginal,
+        IProgress<PatchProgress> progress)
+    {
         var operationLogs = new List<string>
         {
             "开始批量修改 DLL。",
@@ -224,30 +284,30 @@ public partial class MainWindow : Window
         {
             try
             {
-                row.Status = "处理中";
+                progress.Report(new PatchProgress(row, Status: "处理中"));
                 var result = _patcher.Patch(row.Path, replacementFont, overwriteOriginal);
-                row.OutputPath = result.OutputPath;
-                row.ReplacedCount = result.ReplacedCount;
-                row.Status = overwriteOriginal ? "已覆盖" : "已生成";
-                _lastOutputDirectory = row.OutputDirectory;
                 success++;
 
-                AppendLog($"修改完成：{row.Path} | 替换 {result.ReplacedCount} 处 | 输出：{result.OutputPath}");
+                progress.Report(new PatchProgress(
+                    row,
+                    Status: overwriteOriginal ? "已覆盖" : "已生成",
+                    OutputPath: result.OutputPath,
+                    ReplacedCount: result.ReplacedCount,
+                    Message: $"修改完成：{row.Path} | 替换 {result.ReplacedCount} 处 | 输出：{result.OutputPath}"));
                 operationLogs.AddRange(result.Logs);
             }
             catch (Exception ex)
             {
                 failed++;
-                row.Status = "失败";
-                AppendLog($"修改失败：{row.Path} | {ex.Message}");
-                operationLogs.Add($"修改失败：{row.Path} | {ex.Message}");
+                var message = $"修改失败：{row.Path} | {ex.Message}";
+                progress.Report(new PatchProgress(row, Status: "失败", Message: message));
+                operationLogs.Add(message);
             }
         }
 
         var summary = $"批量修改完成：成功 {success} 个，失败 {failed} 个。";
-        AppendLog(summary);
         operationLogs.Add(summary);
-        SaveOperationLog(operationLogs);
+        return new PatchSummary(summary, operationLogs);
     }
 
     private List<string> GetExistingScanRoots()
@@ -260,7 +320,7 @@ public partial class MainWindow : Window
             .ToList();
     }
 
-    private IEnumerable<string> EnumerateDllFilesSafe(string root, ICollection<string> operationLogs)
+    private IEnumerable<string> EnumerateDllFilesSafe(string root, ICollection<string> operationLogs, Action<string> reportLog)
     {
         var pending = new Stack<string>();
         pending.Push(root);
@@ -277,7 +337,7 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
                 var message = $"跳过目录文件枚举：{currentDirectory} | {ex.Message}";
-                AppendLog(message);
+                reportLog(message);
                 operationLogs.Add(message);
                 continue;
             }
@@ -293,7 +353,7 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
                 var message = $"跳过子目录枚举：{currentDirectory} | {ex.Message}";
-                AppendLog(message);
+                reportLog(message);
                 operationLogs.Add(message);
                 continue;
             }
@@ -301,6 +361,20 @@ public partial class MainWindow : Window
             foreach (var subdirectory in subdirectories)
                 pending.Push(subdirectory);
         }
+    }
+
+    private void SetBusy(bool isBusy, string? activeOperation = null)
+    {
+        ScanFoldersButton.IsEnabled = !isBusy;
+        PatchSelectedButton.IsEnabled = !isBusy;
+        InstallPathTextBox.IsEnabled = !isBusy;
+        DataPathTextBox.IsEnabled = !isBusy;
+        ReplacementFontComboBox.IsEnabled = !isBusy;
+        OverwriteCheckBox.IsEnabled = !isBusy;
+        CandidateDataGrid.IsEnabled = !isBusy;
+
+        ScanFoldersButton.Content = isBusy && activeOperation == "scan" ? "扫描中..." : "扫描目录";
+        PatchSelectedButton.Content = isBusy && activeOperation == "patch" ? "修改中..." : "修改已勾选";
     }
 
     private string GetSelectedReplacementFont()
@@ -363,6 +437,19 @@ public partial class MainWindow : Window
         return fileName.Contains(".CJKPatched.dll", StringComparison.OrdinalIgnoreCase)
             || fileName.Contains(".CJKPatch.tmp.dll", StringComparison.OrdinalIgnoreCase);
     }
+
+    private sealed record ScanProgress(string? Message = null, DllCandidateRow? Row = null);
+
+    private sealed record PatchProgress(
+        DllCandidateRow Row,
+        string? Status = null,
+        string? OutputPath = null,
+        int? ReplacedCount = null,
+        string? Message = null);
+
+    private sealed record ScanSummary(string Message, int Candidates, IReadOnlyCollection<string> OperationLogs);
+
+    private sealed record PatchSummary(string Message, IReadOnlyCollection<string> OperationLogs);
 
     private sealed class DllCandidateRow : INotifyPropertyChanged
     {
