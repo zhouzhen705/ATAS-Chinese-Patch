@@ -225,8 +225,8 @@ public partial class MainWindow : Window
         var confirmMessage =
             $"将对 {selectedRows.Count} 个 DLL 批量替换字体为 {replacementFont}。{Environment.NewLine}{Environment.NewLine}" +
             (overwriteOriginal
-                ? "当前模式会先备份再覆盖原 DLL。Program Files 目录可能需要以管理员身份运行。"
-                : "当前模式会在原目录生成 .CJKPatched.dll 文件。Program Files 目录可能需要以管理员身份运行。") +
+                ? "当前模式会覆盖原 DLL。写入成功后会删除临时备份。Program Files 目录可能需要以管理员身份运行。"
+                : "当前模式会在原目录生成 .CJKPatched.dll 文件。写入成功后会删除临时备份。Program Files 目录可能需要以管理员身份运行。") +
             $"{Environment.NewLine}{Environment.NewLine}请确认 ATAS 已关闭。是否继续？";
 
         var confirm = System.Windows.MessageBox.Show(
@@ -275,7 +275,7 @@ public partial class MainWindow : Window
         {
             "开始批量修改 DLL。",
             $"替换字体：{replacementFont}",
-            overwriteOriginal ? "模式：备份后覆盖原 DLL。" : "模式：生成 .CJKPatched.dll。"
+            overwriteOriginal ? "模式：覆盖原 DLL。" : "模式：生成 .CJKPatched.dll。"
         };
         var success = 0;
         var failed = 0;

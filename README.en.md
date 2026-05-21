@@ -38,8 +38,8 @@ Some ATAS custom indicator DLLs hard-code fonts such as Roboto, Arial, Tahoma, S
 7. Choose the replacement font. The default is SimSun.
 8. Click "Patch Selected".
 9. Confirm that ATAS is closed.
-10. By default, the tool creates `OriginalFileName.CJKPatched.dll` in the same folder and backs up the original DLL.
-11. To overwrite the original DLL, enable "Backup then overwrite original DLL". The tool still backs up the original file first. Patching DLLs under `Program Files` may require running as administrator.
+10. By default, the tool creates `OriginalFileName.CJKPatched.dll` in the same folder.
+11. To overwrite the original DLL, enable "Overwrite original DLL". The tool creates a temporary backup first, deletes that backup after a successful write, and tries to keep it if writing fails. Patching DLLs under `Program Files` may require running as administrator.
 
 Common ATAS indicator DLL location:
 
@@ -76,7 +76,7 @@ After clicking "Patch Selected", the default output is:
 TestIndicatorFontSamples.CJKPatched.dll
 ```
 
-A backup folder will also be created:
+A temporary backup folder is created while writing and automatically removed after a successful patch:
 
 ```text
 CJKPatch_Backups\yyyyMMdd_HHmmss
@@ -92,17 +92,18 @@ Log file name format:
 atas-chinese-patch-yyyyMMdd-HHmmss.log
 ```
 
-## Restore From Backup
+## Restore
 
-If ATAS cannot load the indicator after patching, restore the original DLL from the timestamped folder under `CJKPatch_Backups`.
+The tool deletes the temporary backup after a successful patch, so it is recommended to test with the default `.CJKPatched.dll` output first. The default mode does not overwrite the original DLL; to restore, switch back to the original DLL.
+
+If overwriting the original DLL fails, the tool tries to keep the temporary backup under `CJKPatch_Backups`.
 
 Restore steps:
 
 1. Close ATAS.
-2. Open `CJKPatch_Backups\yyyyMMdd_HHmmss`.
-3. Find the backed-up original DLL.
-4. Copy it back to the indicator folder.
-5. If you used "Backup then overwrite original DLL", overwrite the current DLL with the backup file.
+2. If `CJKPatch_Backups\yyyyMMdd_HHmmss` exists, open that folder.
+3. Find the temporary backup of the original DLL.
+4. Copy it back to the indicator folder and overwrite the current DLL.
 
 ## Run
 
@@ -152,8 +153,8 @@ dotnet publish -c Release -r win-x86 --self-contained true /p:PublishSingleFile=
 
 ## Risks
 
-- The tool automatically backs up the original DLL before writing. Backup folders use the `CJKPatch_Backups/yyyyMMdd_HHmmss` format.
+- The tool creates a temporary backup before writing. Backup folders use the `CJKPatch_Backups/yyyyMMdd_HHmmss` format, and the temporary backup is deleted after a successful patch.
 - By default, the original file is not overwritten. A new `.CJKPatched.dll` file is generated instead.
 - If the DLL is strong-name signed, obfuscated, or not a .NET DLL, patching may fail or the patched DLL may not load.
 - If ATAS is not closed, the DLL may be locked, causing backup, write, or load failures.
-- Modifying third-party DLLs may affect indicator stability. Make sure you have permission to modify the custom indicator DLL and keep the original backup.
+- Modifying third-party DLLs may affect indicator stability. Make sure you have permission to modify the custom indicator DLL. If you need a long-term rollback point, keep a separate copy of the original file outside this tool.

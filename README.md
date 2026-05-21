@@ -38,8 +38,8 @@ ATAS Chinese Patch 是一个外部 Windows 桌面 EXE 工具，用于修复 ATAS
 7. 选择替换字体，默认是 SimSun。
 8. 点击“修改已勾选”。
 9. 再次确认 ATAS 已关闭。
-10. 默认会在原 DLL 同级目录生成 `原文件名.CJKPatched.dll`，并自动备份原始 DLL。
-11. 如需覆盖原 DLL，可勾选“备份后覆盖原 DLL”，工具仍会先备份再写回。修改 `Program Files` 下的 DLL 可能需要以管理员身份运行。
+10. 默认会在原 DLL 同级目录生成 `原文件名.CJKPatched.dll`。
+11. 如需覆盖原 DLL，可勾选“覆盖原 DLL”。工具会先创建临时备份，写入成功后自动删除该备份；写入失败时会尽量保留备份。修改 `Program Files` 下的 DLL 可能需要以管理员身份运行。
 
 ATAS 指标 DLL 常见位置：
 
@@ -76,7 +76,7 @@ TestIndicatorFontSamples\bin\Release\net10.0\TestIndicatorFontSamples.dll
 TestIndicatorFontSamples.CJKPatched.dll
 ```
 
-同时会创建备份目录：
+写入时会临时创建备份目录，修改成功后会自动删除：
 
 ```text
 CJKPatch_Backups\yyyyMMdd_HHmmss
@@ -92,17 +92,18 @@ CJKPatch_Backups\yyyyMMdd_HHmmss
 atas-chinese-patch-yyyyMMdd-HHmmss.log
 ```
 
-## 如何恢复备份
+## 如何恢复
 
-如果补丁后 ATAS 无法加载指标，可以从原 DLL 同级目录下的 `CJKPatch_Backups` 找到对应时间的备份。
+成功修改后工具会删除本次临时备份，因此建议先在默认模式下生成 `.CJKPatched.dll` 进行验证。默认模式不会覆盖原 DLL，恢复时只需要改回使用原 DLL。
+
+如果覆盖原 DLL 时写入失败，工具会尽量保留原 DLL 同级目录下的 `CJKPatch_Backups` 临时备份。
 
 恢复方式：
 
 1. 关闭 ATAS。
-2. 打开 `CJKPatch_Backups\yyyyMMdd_HHmmss`。
-3. 找到备份的原始 DLL。
-4. 将该 DLL 复制回指标目录。
-5. 如果你之前选择了“备份后覆盖原 DLL”，请用备份文件覆盖当前 DLL。
+2. 如果存在 `CJKPatch_Backups\yyyyMMdd_HHmmss`，打开该目录。
+3. 找到临时备份的原始 DLL。
+4. 将该 DLL 复制回指标目录并覆盖当前 DLL。
 
 ## 如何运行
 
@@ -152,8 +153,8 @@ dotnet publish -c Release -r win-x86 --self-contained true /p:PublishSingleFile=
 
 ## 风险说明
 
-- 工具会在写入前自动备份原始 DLL，备份目录格式为 `CJKPatch_Backups/yyyyMMdd_HHmmss`。
+- 工具会在写入前创建临时备份，备份目录格式为 `CJKPatch_Backups/yyyyMMdd_HHmmss`；修改成功后会删除本次临时备份。
 - 默认不覆盖原文件，而是生成新的 `.CJKPatched.dll` 文件。
 - 如果 DLL 被强签名、混淆或不是 .NET DLL，可能无法补丁或补丁后无法加载。
 - 如果 ATAS 未关闭，DLL 可能被占用，导致备份、写入或加载失败。
-- 修改第三方 DLL 可能影响指标运行稳定性。使用前请确认你有权修改该自定义指标 DLL，并保留原始备份。
+- 修改第三方 DLL 可能影响指标运行稳定性。使用前请确认你有权修改该自定义指标 DLL；如需长期回滚点，请在工具外另行保留原始文件。

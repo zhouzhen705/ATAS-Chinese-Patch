@@ -120,7 +120,7 @@ public sealed class IndicatorFontPatcher
             throw new InvalidOperationException("未发现可替换的硬编码字体，补丁不会生效。");
 
         result.BackupPath = CreateBackup(inputDllPath);
-        result.Logs.Add($"已备份原始 DLL：{result.BackupPath}");
+        result.Logs.Add($"已创建临时备份：{result.BackupPath}");
 
         if (overwriteOriginal)
         {
@@ -133,8 +133,10 @@ public sealed class IndicatorFontPatcher
             WriteModule(module, result.OutputPath);
         }
 
+        DeleteSuccessfulBackup(result.BackupPath, result.Logs);
+
         result.Logs.Add(overwriteOriginal
-            ? "已备份并覆盖原 DLL。"
+            ? "已覆盖原 DLL。"
             : $"已生成补丁 DLL：{result.OutputPath}");
         result.Logs.Add($"替换数量：{result.ReplacedCount}");
         result.Logs.Add("操作完成。");
@@ -198,6 +200,45 @@ public sealed class IndicatorFontPatcher
         {
             throw new InvalidOperationException($"DLL 备份失败，文件可能被占用。请确认 ATAS 已关闭。详细信息：{ex.Message}", ex);
         }
+    }
+
+    private static void DeleteSuccessfulBackup(string backupPath, ICollection<string> logs)
+    {
+        if (string.IsNullOrWhiteSpace(backupPath))
+            return;
+
+        try
+        {
+            if (!File.Exists(backupPath))
+                return;
+
+            var timestampDirectory = Path.GetDirectoryName(backupPath);
+            var backupRootDirectory = !string.IsNullOrWhiteSpace(timestampDirectory)
+                ? Path.GetDirectoryName(timestampDirectory)
+                : null;
+
+            File.Delete(backupPath);
+            logs.Add($"修改成功，已删除临时备份：{backupPath}");
+
+            DeleteDirectoryIfEmpty(timestampDirectory, logs);
+            DeleteDirectoryIfEmpty(backupRootDirectory, logs);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logs.Add($"修改已成功，但临时备份删除失败：{backupPath} | {ex.Message}");
+        }
+    }
+
+    private static void DeleteDirectoryIfEmpty(string? directoryPath, ICollection<string> logs)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
+            return;
+
+        if (Directory.EnumerateFileSystemEntries(directoryPath).Any())
+            return;
+
+        Directory.Delete(directoryPath);
+        logs.Add($"已删除空备份目录：{directoryPath}");
     }
 
     private static string GetPatchedOutputPath(string inputDllPath)
